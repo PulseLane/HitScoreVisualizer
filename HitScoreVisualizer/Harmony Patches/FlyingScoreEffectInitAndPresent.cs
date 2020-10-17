@@ -1,70 +1,77 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using HitScoreVisualizer.Services;
+using IPA.Utilities;
 using UnityEngine;
-
-using static HitScoreVisualizer.Utils.ReflectionUtil;
 
 namespace HitScoreVisualizer.Harmony_Patches
 {
-    [HarmonyPatch(typeof(FlyingScoreEffect), "InitAndPresent",
-        new Type[] {
-            typeof(NoteCutInfo),
-            typeof(int),
-            typeof(float),
-            typeof(Vector3),
-            typeof(Quaternion),
-            typeof(Color)})]
-    class FlyingScoreEffectInitAndPresent
-    {
-        public static FlyingScoreEffect currentEffect = null;
-        static void Prefix(ref Vector3 targetPos, FlyingScoreEffect __instance)
-        {
-            if (Config.instance.useFixedPos)
-            {
-                // Set current and target position to the desired fixed position
-                __instance.transform.position = new Vector3(Config.instance.fixedPosX, Config.instance.fixedPosY, Config.instance.fixedPosZ);
-                targetPos = __instance.transform.position;
-                // If there's an existing judgment effect, clear that first
-                if (currentEffect != null)
-                {
-                    // Remove it gracefully by setting its duration to 0
-                    currentEffect.setPrivateFieldBase("_duration", 0f);
-                    // We don't need to clear currentEffect when it disappears, because we'll be setting it to the new effect anyway
-                    currentEffect.didFinishEvent -= handleEffectDidFinish;
-                }
-                // Save the existing effect to clear if a new one spawns
-                currentEffect = __instance;
-                // In case it despawns before the next note is hit, don't try to clear it
-                currentEffect.didFinishEvent += handleEffectDidFinish;
-            }
-        }
+	[HarmonyPatch(typeof(FlyingScoreEffect))]
+	[HarmonyPatch("InitAndPresent", MethodType.Normal)]
+	internal class FlyingScoreEffectInitAndPresent
+	{
+		private static FlyingScoreEffect _currentEffect = null!;
 
-        static void handleEffectDidFinish(FlyingObjectEffect effect)
-        {
-            effect.didFinishEvent -= handleEffectDidFinish;
-            if (currentEffect == effect) currentEffect = null;
-        }
+// ReSharper disable InconsistentNaming
+		internal static void Prefix(FlyingScoreEffect __instance, ref Vector3 targetPos)
+// ReSharper restore InconsistentNaming
+		{
+			if (ConfigProvider.CurrentConfig?.UseFixedPos ?? false)
+			{
+				var transform = __instance.transform;
 
-        static void Postfix(FlyingScoreEffect __instance, ref Color ____color, NoteCutInfo noteCutInfo)
-        {
-            void judge(SaberSwingRatingCounter counter)
-            {
-                
-                ScoreModel.RawScoreWithoutMultiplier(noteCutInfo, out int before, out int after, out int accuracy);
-                int total = before + after + accuracy;
-                Config.judge(__instance, noteCutInfo, counter, total, before, after, accuracy);
+				// Set current and target position to the desired fixed position
+				transform.position = ConfigProvider.CurrentConfig.FixedPos;
+				targetPos = transform.position;
 
-                // If the counter is finished, remove our event from it
-                counter.didFinishEvent -= judge;
-            }
+				// If there's an existing judgment effect, clear that first
+				if (_currentEffect != null)
+				{
+					// Remove it gracefully by setting its duration to 0
+					_currentEffect.SetField("_duration", 0f);
 
-            // Apply judgments a total of twice - once when the effect is created, once when it finishes.
-            judge(noteCutInfo.swingRatingCounter);
-            noteCutInfo.swingRatingCounter.didFinishEvent += judge;
-        }
-    }
+					// We don't need to clear currentEffect when it disappears, because we'll be setting it to the new effect anyway
+					_currentEffect.didFinishEvent -= HandleEffectDidFinish;
+				}
+
+				// Save the existing effect to clear if a new one spawns
+				_currentEffect = __instance;
+
+				// In case it despawns before the next note is hit, don't try to clear it
+				_currentEffect.didFinishEvent += HandleEffectDidFinish;
+			}
+		}
+
+// ReSharper disable InconsistentNaming
+		internal static void Postfix(FlyingScoreEffect __instance, NoteCutInfo noteCutInfo)
+// ReSharper restore InconsistentNaming
+		{
+			if (ConfigProvider.CurrentConfig == null)
+			{
+				return;
+			}
+
+			void Judge(ISaberSwingRatingCounter counter)
+			{
+				ScoreModel.RawScoreWithoutMultiplier(noteCutInfo, out var before, out var after, out var accuracy);
+				var total = before + after + accuracy;
+				JudgmentService.Judge(__instance, total, before, after, accuracy);
+
+				// If the counter is finished, remove our event from it
+				counter.didFinishEvent -= Judge;
+			}
+
+			// Apply judgments a total of twice - once when the effect is created, once when it finishes.
+			Judge(noteCutInfo.swingRatingCounter);
+			noteCutInfo.swingRatingCounter.didFinishEvent += Judge;
+		}
+
+		private static void HandleEffectDidFinish(FlyingObjectEffect effect)
+		{
+			effect.didFinishEvent -= HandleEffectDidFinish;
+			if (_currentEffect == effect)
+			{
+				_currentEffect = null!;
+			}
+		}
+	}
 }
