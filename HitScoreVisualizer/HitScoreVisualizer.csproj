@@ -13,6 +13,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Reference Include="BeatmapCore">
+		  <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatmapCore.dll</HintPath>
+		</Reference>
 		<Reference Include="UnityEngine">
 			<HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.dll</HintPath>
 			<Private>False</Private>

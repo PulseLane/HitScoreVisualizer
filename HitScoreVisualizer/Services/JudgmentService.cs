@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using HitScoreVisualizer.Extensions;
+using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Settings;
 using TMPro;
 using UnityEngine;
@@ -16,7 +18,7 @@ namespace HitScoreVisualizer.Services
 			_configProvider = configProvider;
 		}
 
-		internal void Judge(ScoreModel.NoteScoreDefinition noteScoreDefinition, ref TextMeshPro text, ref Color color, int score, int before, int after, int accuracy, float timeDependence)
+		internal void Judge(ScoreModel.NoteScoreDefinition noteScoreDefinition, ref TextMeshPro text, ref Color color, int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection)
 		{
 			var config = _configProvider.GetCurrentConfig();
 			if (config == null)
@@ -49,7 +51,7 @@ namespace HitScoreVisualizer.Services
 
 			text.text = config.DisplayMode switch
 			{
-				"format" => DisplayModeFormat(noteScoreDefinition, score, before, after, accuracy, timeDependence, judgment, config),
+				"format" => DisplayModeFormat(noteScoreDefinition, score, before, after, accuracy, timeDependence, trueAccuracy, offDirection, judgment, config),
 				"textOnly" => judgment.Text,
 				"numeric" => score.ToString(),
 				"scoreOnTop" => $"{score}\n{judgment.Text}\n",
@@ -58,7 +60,7 @@ namespace HitScoreVisualizer.Services
 		}
 
 		// ReSharper disable once CognitiveComplexity
-		private static string DisplayModeFormat(ScoreModel.NoteScoreDefinition noteScoreDefinition, int score, int before, int after, int accuracy, float timeDependence, Judgment judgment, Configuration instance)
+		private static string DisplayModeFormat(ScoreModel.NoteScoreDefinition noteScoreDefinition, int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection, Judgment judgment, Configuration instance)
 		{
 			var formattedBuilder = new StringBuilder();
 			var formatString = judgment.Text;
@@ -80,6 +82,15 @@ namespace HitScoreVisualizer.Services
 						break;
 					case 'c':
 						formattedBuilder.Append(accuracy);
+						break;
+					case 'P':
+						formattedBuilder.Append(trueAccuracy.ToString("F1", CultureInfo.InvariantCulture));
+						break;
+					case 'd':
+						if (offDirection != OffDirection.NONE)
+						{
+							formattedBuilder.Append(offDirection == OffDirection.UNDER ? "-" : "+");
+						}
 						break;
 					case 'a':
 						formattedBuilder.Append(after);
