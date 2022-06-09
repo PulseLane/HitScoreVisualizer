@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using HitScoreVisualizer.Extensions;
+using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Settings;
 using TMPro;
 using UnityEngine;
@@ -16,7 +18,7 @@ namespace HitScoreVisualizer.Services
 			_config = configProvider.GetCurrentConfig();
 		}
 
-		internal void Judge(ref TextMeshPro text, ref Color color, int score, int before, int after, int accuracy, float timeDependence)
+		internal void Judge(ref TextMeshPro text, ref Color color, int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection)
 		{
 			if (_config == null)
 			{
@@ -48,7 +50,7 @@ namespace HitScoreVisualizer.Services
 
 			text.text = _config.DisplayMode switch
 			{
-				"format" => DisplayModeFormat(score, before, after, accuracy, timeDependence, judgment, _config),
+				"format" => DisplayModeFormat(score, before, after, accuracy, timeDependence, trueAccuracy, offDirection, judgment, _config),
 				"textOnly" => judgment.Text,
 				"numeric" => score.ToString(),
 				"scoreOnTop" => $"{score}\n{judgment.Text}\n",
@@ -57,7 +59,7 @@ namespace HitScoreVisualizer.Services
 		}
 
 		// ReSharper disable once CognitiveComplexity
-		private static string DisplayModeFormat(int score, int before, int after, int accuracy, float timeDependence, Judgment judgment, Configuration instance)
+		private static string DisplayModeFormat(int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection, Judgment judgment, Configuration instance)
 		{
 			var formattedBuilder = new StringBuilder();
 			var formatString = judgment.Text;
@@ -79,6 +81,15 @@ namespace HitScoreVisualizer.Services
 						break;
 					case 'c':
 						formattedBuilder.Append(accuracy);
+						break;
+					case 'P':
+						formattedBuilder.Append(trueAccuracy.ToString("F1", CultureInfo.InvariantCulture));
+						break;
+					case 'd':
+						if (offDirection != OffDirection.NONE)
+						{
+							formattedBuilder.Append(offDirection == OffDirection.UNDER ? "-" : "+");
+						}
 						break;
 					case 'a':
 						formattedBuilder.Append(after);
