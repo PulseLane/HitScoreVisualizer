@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+using HitScoreVisualizer.HarmonyPatches;
 using HitScoreVisualizer.Services;
 using HitScoreVisualizer.Settings;
+using SiraUtil.Affinity;
+using SiraUtil.Logging;
 using UnityEngine;
 using Zenject;
 
@@ -12,11 +16,15 @@ namespace HitScoreVisualizer.Models
 
 		private NoteCutInfo? _noteCutInfo;
 
+		private NoteCutSpawnerPatch? _directionProvider;
+
 		[Inject]
-		internal void Construct(JudgmentService judgmentService, ConfigProvider configProvider)
+		internal void Construct(JudgmentService judgmentService, ConfigProvider configProvider, NoteCutSpawnerPatch directionProvider)
 		{
 			_judgmentService = judgmentService;
 			_configuration = configProvider.GetCurrentConfig();
+
+			_directionProvider = directionProvider;
 		}
 
 		public override void InitAndPresent(IReadonlyCutScoreBuffer cutScoreBuffer, float duration, Vector3 targetPos, Color color)
@@ -101,7 +109,11 @@ namespace HitScoreVisualizer.Models
 			var accuracy = cutScoreBuffer.centerDistanceCutScore;
 			var total = before + after + accuracy;
 			var timeDependence = Mathf.Abs(_noteCutInfo!.Value.cutNormal.z);
-			_judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref _text, ref _color, total, before, after, accuracy, timeDependence);
+            OffDirection direction = OffDirection.NONE;
+            _directionProvider!.directionDict.TryGetValue(_noteCutInfo!.Value, out direction);
+
+            var trueAccuracy = (1f - Mathf.Clamp01(_cutDistanceToCenter / 0.3f)) * 15f;
+            _judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref _text, ref _color, total, before, after, accuracy, timeDependence, trueAccuracy, direction);
 		}
 	}
 }

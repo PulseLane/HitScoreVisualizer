@@ -1,4 +1,5 @@
-﻿using HitScoreVisualizer.Services;
+using HitScoreVisualizer.HarmonyPatches;
+using HitScoreVisualizer.Services;
 using Zenject;
 
 namespace HitScoreVisualizer.Installers
@@ -8,6 +9,7 @@ namespace HitScoreVisualizer.Installers
 		public override void InstallBindings()
 		{
 			Container.Bind<JudgmentService>().AsSingle();
+			Container.BindInterfacesAndSelfTo<NoteCutSpawnerPatch>().AsSingle();
 		}
 	}
 }
