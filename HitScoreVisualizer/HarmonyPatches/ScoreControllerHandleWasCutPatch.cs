@@ -5,20 +5,21 @@ using System.Text;
 using System.Threading.Tasks;
 using HitScoreVisualizer.Models;
 using SiraUtil.Affinity;
+using static HitScoreVisualizer.Models.HsvFlyingScoreEffect;
 
 namespace HitScoreVisualizer.HarmonyPatches
 {
-	internal class NoteCutSpawnerPatch : IAffinity
+	internal class ScoreControllerHandleWasCutPatch : IAffinity
 	{
 		public Dictionary<NoteCutInfo, OffDirection> directionDict = null!;
 
-		public NoteCutSpawnerPatch()
+		public ScoreControllerHandleWasCutPatch()
 		{
 			directionDict = new Dictionary<NoteCutInfo, OffDirection>();
 		}
 
 		[AffinityPrefix]
-		[AffinityPatch(typeof(NoteCutScoreSpawner), nameof(NoteCutScoreSpawner.HandleNoteWasCut))]
+		[AffinityPatch(typeof(ScoreController), nameof(ScoreController.HandleNoteWasCut))]
 		private void NoteWasCutPrefix(NoteController noteController, in NoteCutInfo noteCutInfo)
 		{
 			directionDict.Add(noteCutInfo, GetWrongSwingDirection(noteController, in noteCutInfo));
