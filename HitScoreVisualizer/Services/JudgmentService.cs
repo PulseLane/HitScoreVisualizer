@@ -6,6 +6,7 @@ using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Settings;
 using TMPro;
 using UnityEngine;
+using static HitScoreVisualizer.Models.HsvFlyingScoreEffect;
 
 namespace HitScoreVisualizer.Services
 {

@@ -9,7 +9,7 @@ namespace HitScoreVisualizer.Installers
 		public override void InstallBindings()
 		{
 			Container.Bind<JudgmentService>().AsSingle();
-			Container.BindInterfacesAndSelfTo<NoteCutSpawnerPatch>().AsSingle();
+			Container.BindInterfacesAndSelfTo<ScoreControllerHandleWasCutPatch>().AsSingle();
 		}
 	}
 }

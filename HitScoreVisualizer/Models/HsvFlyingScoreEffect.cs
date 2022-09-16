@@ -16,10 +16,10 @@ namespace HitScoreVisualizer.Models
 
 		private NoteCutInfo? _noteCutInfo;
 
-		private NoteCutSpawnerPatch? _directionProvider;
+		private ScoreControllerHandleWasCutPatch? _directionProvider;
 
 		[Inject]
-		internal void Construct(JudgmentService judgmentService, ConfigProvider configProvider, NoteCutSpawnerPatch directionProvider)
+		internal void Construct(JudgmentService judgmentService, ConfigProvider configProvider, ScoreControllerHandleWasCutPatch directionProvider)
 		{
 			_judgmentService = judgmentService;
 			_configuration = configProvider.GetCurrentConfig();
@@ -112,8 +112,15 @@ namespace HitScoreVisualizer.Models
             OffDirection direction = OffDirection.NONE;
             _directionProvider!.directionDict.TryGetValue(_noteCutInfo!.Value, out direction);
 
-            var trueAccuracy = (1f - Mathf.Clamp01(_cutDistanceToCenter / 0.3f)) * 15f;
+            var trueAccuracy = (1f - Mathf.Clamp01(_noteCutInfo!.Value.cutDistanceToCenter / 0.3f)) * 15f;
             _judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref _text, ref _color, total, before, after, accuracy, timeDependence, trueAccuracy, direction);
+		}
+
+		internal enum OffDirection
+		{
+			NONE,
+			UNDER,
+			OVER
 		}
 	}
 }
