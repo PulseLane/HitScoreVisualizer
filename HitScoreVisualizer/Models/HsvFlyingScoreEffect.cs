@@ -118,9 +118,15 @@ namespace HitScoreVisualizer.Models
 
 		internal enum OffDirection
 		{
-			NONE,
-			UNDER,
-			OVER
+			LEFT,
+			DOWNLEFT,
+			DOWN,
+			DOWNRIGHT,
+			RIGHT,
+			UPRIGHT,
+			UP,
+			UPLEFT,
+			NONE
 		}
 	}
 }
