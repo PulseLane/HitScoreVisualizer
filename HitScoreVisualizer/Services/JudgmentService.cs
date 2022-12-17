@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -88,10 +89,7 @@ namespace HitScoreVisualizer.Services
 						formattedBuilder.Append(trueAccuracy.ToString("F1", CultureInfo.InvariantCulture));
 						break;
 					case 'd':
-						if (offDirection != OffDirection.NONE)
-						{
-							formattedBuilder.Append(offDirection == OffDirection.UNDER ? "-" : "+");
-						}
+						formattedBuilder.Append(FormatDirectionSegment(offDirection));
 						break;
 					case 'a':
 						formattedBuilder.Append(after);
@@ -218,6 +216,31 @@ namespace HitScoreVisualizer.Services
 		{
 			var multiplier = Mathf.Pow(10, decimalOffset);
 			return (timeDependence * multiplier).ToString($"n{decimalPrecision}");
+		}
+
+		private static string FormatDirectionSegment(OffDirection offDirection)
+		{
+			switch (offDirection)
+			{
+				case OffDirection.LEFT:
+					return "←";
+				case OffDirection.DOWNLEFT:
+					return "↙";
+				case OffDirection.DOWN:
+					return "↓";
+				case OffDirection.DOWNRIGHT:
+					return "↘";
+				case OffDirection.RIGHT:
+					return "→";
+				case OffDirection.UPRIGHT:
+					return "↗";
+				case OffDirection.UP:
+					return "↑";
+				case OffDirection.UPLEFT:
+					return "↖";
+				default:
+					return "";
+			}
 		}
 	}
 }
