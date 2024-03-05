@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -7,7 +7,7 @@ using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Settings;
 using TMPro;
 using UnityEngine;
-using static HitScoreVisualizer.Models.HsvFlyingScoreEffect;
+using static HitScoreVisualizer.Models.OffDirection;
 
 namespace HitScoreVisualizer.Services
 {

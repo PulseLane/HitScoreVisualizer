@@ -1,3 +1,4 @@
+using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Services;
 using SiraUtil.Affinity;
 using UnityEngine;
@@ -9,10 +10,14 @@ namespace HitScoreVisualizer.HarmonyPatches
 		private readonly JudgmentService _judgmentService;
 		private readonly ConfigProvider _configProvider;
 
-		public FlyingScoreEffectPatch(JudgmentService judgmentService, ConfigProvider configProvider)
+		private ScoreControllerHandleWasCutPatch? _directionProvider;
+
+		public FlyingScoreEffectPatch(JudgmentService judgmentService, ConfigProvider configProvider, ScoreControllerHandleWasCutPatch directionProvider)
 		{
 			_judgmentService = judgmentService;
 			_configProvider = configProvider;
+
+			_directionProvider = directionProvider;
 		}
 
 		[AffinityPrefix]
@@ -112,7 +117,11 @@ namespace HitScoreVisualizer.HarmonyPatches
 			var accuracy = cutScoreBuffer.centerDistanceCutScore;
 			var total = before + after + accuracy;
 			var timeDependence = Mathf.Abs(cutScoreBuffer.noteCutInfo.cutNormal.z);
-			_judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref flyingScoreEffect._text, ref flyingScoreEffect._color, total, before, after, accuracy, timeDependence);
+			OffDirection direction = OffDirection.NONE;
+			_directionProvider!.directionDict.TryGetValue(cutScoreBuffer.noteCutInfo, out direction);
+
+			var trueAccuracy = (1f - Mathf.Clamp01(cutScoreBuffer.noteCutInfo.cutDistanceToCenter / 0.3f)) * 15f;
+			_judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref flyingScoreEffect._text, ref flyingScoreEffect._color, total, before, after, accuracy, timeDependence, trueAccuracy, direction);
 		}
 	}
 }

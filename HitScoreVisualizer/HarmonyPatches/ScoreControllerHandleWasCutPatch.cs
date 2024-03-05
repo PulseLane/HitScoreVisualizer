@@ -7,7 +7,7 @@ using HitScoreVisualizer.Models;
 using SiraUtil.Affinity;
 using SiraUtil.Logging;
 using UnityEngine;
-using static HitScoreVisualizer.Models.HsvFlyingScoreEffect;
+using static HitScoreVisualizer.Models.OffDirection;
 
 namespace HitScoreVisualizer.HarmonyPatches
 {
