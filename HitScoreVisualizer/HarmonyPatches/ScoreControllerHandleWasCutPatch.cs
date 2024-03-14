@@ -46,7 +46,7 @@ namespace HitScoreVisualizer.HarmonyPatches
 		[AffinityPatch(typeof(ScoreController), nameof(ScoreController.HandleNoteWasCut))]
 		private void NoteWasCutPrefix(NoteController noteController, in NoteCutInfo noteCutInfo)
 		{
-			directionDict.Add(noteCutInfo, GetWrongSwingDirection(noteController, in noteCutInfo));
+			directionDict[noteCutInfo] = GetWrongSwingDirection(noteController, in noteCutInfo);
 		}
 
 		private OffDirection GetWrongSwingDirection(NoteController noteController, in NoteCutInfo noteCutInfo)
