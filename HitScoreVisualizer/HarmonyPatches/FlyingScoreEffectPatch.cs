@@ -1,30 +1,20 @@
-using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Services;
 using SiraUtil.Affinity;
 using UnityEngine;
 
 namespace HitScoreVisualizer.HarmonyPatches
 {
-	internal class FlyingScoreEffectPatch : IAffinity
+	internal class FlyingScoreEffectPatch(JudgmentService judgmentService, ConfigProvider configProvider, ScoreControllerHandleWasCutPatch directionProvider) : IAffinity
 	{
-		private readonly JudgmentService _judgmentService;
-		private readonly ConfigProvider _configProvider;
-
-		private ScoreControllerHandleWasCutPatch? _directionProvider;
-
-		public FlyingScoreEffectPatch(JudgmentService judgmentService, ConfigProvider configProvider, ScoreControllerHandleWasCutPatch directionProvider)
-		{
-			_judgmentService = judgmentService;
-			_configProvider = configProvider;
-
-			_directionProvider = directionProvider;
-		}
+		private readonly JudgmentService judgmentService = judgmentService;
+		private readonly ConfigProvider configProvider = configProvider;
+		private readonly ScoreControllerHandleWasCutPatch _directionProvider = directionProvider;
 
 		[AffinityPrefix]
 		[AffinityPatch(typeof(FlyingScoreEffect), nameof(FlyingScoreEffect.InitAndPresent))]
 		internal bool InitAndPresent(ref FlyingScoreEffect __instance, IReadonlyCutScoreBuffer cutScoreBuffer, float duration, Vector3 targetPos, Color color)
 		{
-			var configuration = _configProvider.GetCurrentConfig();
+			var configuration = configProvider.CurrentConfig;
 			var noteCutInfo = cutScoreBuffer.noteCutInfo;
 
 			if (configuration != null)
@@ -50,7 +40,7 @@ namespace HitScoreVisualizer.HarmonyPatches
 				__instance._registeredToCallbacks = true;
 			}
 
-			if (configuration == null || noteCutInfo.noteData.gameplayType is not NoteData.GameplayType.Normal)
+			if (configuration == null)
 			{
 				__instance._text.text = cutScoreBuffer.cutScore.ToString();
 				__instance._maxCutDistanceScoreIndicator.enabled = cutScoreBuffer.centerDistanceCutScore == cutScoreBuffer.noteScoreDefinition.maxCenterDistanceCutScore;
@@ -61,7 +51,7 @@ namespace HitScoreVisualizer.HarmonyPatches
 				__instance._maxCutDistanceScoreIndicator.enabled = false;
 
 				// Apply judgments a total of twice - once when the effect is created, once when it finishes.
-				Judge(__instance, (CutScoreBuffer) cutScoreBuffer, 30);
+				Judge(__instance, (CutScoreBuffer)cutScoreBuffer);
 			}
 
 			__instance.InitAndPresent(duration, targetPos, noteCutInfo.worldRotation, false);
@@ -84,8 +74,8 @@ namespace HitScoreVisualizer.HarmonyPatches
 		[AffinityPatch(typeof(FlyingScoreEffect), nameof(FlyingScoreEffect.HandleCutScoreBufferDidChange))]
 		internal bool HandleCutScoreBufferDidChange(FlyingScoreEffect __instance, CutScoreBuffer cutScoreBuffer)
 		{
-			var configuration = _configProvider.GetCurrentConfig();
-			if (configuration == null || cutScoreBuffer.noteCutInfo.noteData.gameplayType is not NoteData.GameplayType.Normal)
+			var configuration = configProvider.CurrentConfig;
+			if (configuration == null)
 			{
 				// Run original implementation
 				return true;
@@ -103,25 +93,15 @@ namespace HitScoreVisualizer.HarmonyPatches
 		[AffinityPatch(typeof(FlyingScoreEffect), nameof(FlyingScoreEffect.HandleCutScoreBufferDidFinish))]
 		internal void HandleCutScoreBufferDidFinish(FlyingScoreEffect __instance, CutScoreBuffer cutScoreBuffer)
 		{
-			var configuration = _configProvider.GetCurrentConfig();
-			if (configuration != null && cutScoreBuffer.noteCutInfo.noteData.gameplayType is NoteData.GameplayType.Normal)
+			if (configProvider.CurrentConfig != null)
 			{
 				Judge(__instance, cutScoreBuffer);
 			}
 		}
 
-		private void Judge(FlyingScoreEffect flyingScoreEffect, CutScoreBuffer cutScoreBuffer, int? assumedAfterCutScore = null)
+		private void Judge(FlyingScoreEffect flyingScoreEffect, IReadonlyCutScoreBuffer cutScoreBuffer)
 		{
-			var before = cutScoreBuffer.beforeCutScore;
-			var after = assumedAfterCutScore ?? cutScoreBuffer.afterCutScore;
-			var accuracy = cutScoreBuffer.centerDistanceCutScore;
-			var total = before + after + accuracy;
-			var timeDependence = Mathf.Abs(cutScoreBuffer.noteCutInfo.cutNormal.z);
-			OffDirection direction = OffDirection.NONE;
-			_directionProvider!.directionDict.TryGetValue(cutScoreBuffer.noteCutInfo, out direction);
-
-			var trueAccuracy = (1f - Mathf.Clamp01(cutScoreBuffer.noteCutInfo.cutDistanceToCenter / 0.3f)) * 15f;
-			_judgmentService.Judge(cutScoreBuffer.noteScoreDefinition, ref flyingScoreEffect._text, ref flyingScoreEffect._color, total, before, after, accuracy, timeDependence, trueAccuracy, direction);
+			(flyingScoreEffect._text.text, flyingScoreEffect._color) = judgmentService.Judge(cutScoreBuffer);
 		}
 	}
 }

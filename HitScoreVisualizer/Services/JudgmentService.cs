@@ -1,89 +1,135 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Text;
 using HitScoreVisualizer.Extensions;
 using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Settings;
-using TMPro;
+using SiraUtil.Logging;
 using UnityEngine;
 using static HitScoreVisualizer.Models.OffDirection;
 
 namespace HitScoreVisualizer.Services
 {
-	internal class JudgmentService
+	internal class JudgmentService(ConfigProvider configProvider)
 	{
-		private readonly ConfigProvider _configProvider;
+		private readonly ConfigProvider configProvider = configProvider;
 
-		public JudgmentService(ConfigProvider configProvider)
+		private Configuration Config => configProvider.CurrentConfig ?? Configuration.Default;
+
+		public (string hitScoreText, Color hitScoreColor) Judge(IReadonlyCutScoreBuffer cutScoreBuffer)
 		{
-			_configProvider = configProvider;
-		}
-
-		internal void Judge(ScoreModel.NoteScoreDefinition noteScoreDefinition, ref TextMeshPro text, ref Color color, int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection)
-		{
-			var config = _configProvider.GetCurrentConfig();
-			if (config == null)
+			return cutScoreBuffer.noteCutInfo.noteData.gameplayType switch
 			{
-				return;
-			}
-
-			// enable rich text
-			text.richText = true;
-			// disable word wrap, make sure full text displays
-			text.enableWordWrapping = false;
-			text.overflowMode = TextOverflowModes.Overflow;
-
-			// save in case we need to fade
-			var index = config.Judgments!.FindIndex(j => j.Threshold <= score);
-			var judgment = index >= 0 ? config.Judgments[index] : Judgment.Default;
-
-			if (judgment.Fade)
-			{
-				var fadeJudgment = config.Judgments[index - 1];
-				var baseColor = judgment.Color.ToColor();
-				var fadeColor = fadeJudgment.Color.ToColor();
-				var lerpDistance = Mathf.InverseLerp(judgment.Threshold, fadeJudgment.Threshold, score);
-				color = Color.Lerp(baseColor, fadeColor, lerpDistance);
-			}
-			else
-			{
-				color = judgment.Color.ToColor();
-			}
-
-			text.text = config.DisplayMode switch
-			{
-				"format" => DisplayModeFormat(noteScoreDefinition, score, before, after, accuracy, timeDependence, trueAccuracy, offDirection, judgment, config),
-				"textOnly" => judgment.Text,
-				"numeric" => score.ToString(),
-				"scoreOnTop" => $"{score}\n{judgment.Text}\n",
-				_ => $"{judgment.Text}\n{score}\n"
+				NoteData.GameplayType.Normal => GetNormalDispaly(cutScoreBuffer),
+				NoteData.GameplayType.BurstSliderHead => GetChainHeadDisplay(cutScoreBuffer),
+				NoteData.GameplayType.BurstSliderElement => GetChainSegmentDisplay(cutScoreBuffer),
+				_ => (string.Empty, Color.white),
 			};
 		}
 
-		// ReSharper disable once CognitiveComplexity
-		private static string DisplayModeFormat(ScoreModel.NoteScoreDefinition noteScoreDefinition, int score, int before, int after, int accuracy, float timeDependence, float trueAccuracy, OffDirection offDirection, Judgment judgment, Configuration instance)
+		private (string, Color) GetNormalDispaly(IReadonlyCutScoreBuffer cutScoreBuffer)
+		{
+			var judgment = NormalJudgment.Default;
+			var fadeJudgment = NormalJudgment.Default;
+			Config.NormalJudgments ??= [judgment];
+
+			for (var i = 0; i < Config.NormalJudgments.Count; i++)
+			{
+				if (Config.NormalJudgments[i].Threshold <= cutScoreBuffer.cutScore)
+				{
+					judgment = Config.NormalJudgments[i];
+					if (i > 0)
+					{
+						fadeJudgment = Config.NormalJudgments[i - 1];
+					}
+					break;
+				}
+			}
+
+			var color = judgment.Fade
+				? Color.Lerp(
+					judgment.Color.ToColor(),
+					fadeJudgment.Color.ToColor(),
+					Mathf.InverseLerp(judgment.Threshold, fadeJudgment.Threshold, cutScoreBuffer.cutScore))
+				: judgment.Color.ToColor();
+
+			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer);
+
+			return (text, color);
+		}
+
+		private (string, Color) GetChainHeadDisplay(IReadonlyCutScoreBuffer cutScoreBuffer)
+		{
+			var judgment = ChainHeadJudgment.Default;
+			var fadeJudgment = ChainHeadJudgment.Default;
+			Config.ChainHeadJudgments ??= [judgment];
+
+			for (var i = 0; i < Config.ChainHeadJudgments.Count; i++)
+			{
+				if (Config.ChainHeadJudgments[i].Threshold <= cutScoreBuffer.cutScore)
+				{
+					judgment = Config.ChainHeadJudgments[i];
+					if (i > 0)
+					{
+						fadeJudgment = Config.ChainHeadJudgments[i - 1];
+					}
+					break;
+				}
+			}
+
+			var color = judgment.Fade
+				? Color.Lerp(
+					judgment.Color!.ToColor(),
+					fadeJudgment.Color.ToColor(),
+					Mathf.InverseLerp(judgment.Threshold, fadeJudgment.Threshold, cutScoreBuffer.cutScore))
+				: judgment.Color?.ToColor();
+
+			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer);
+
+			return (text, color ?? Color.white);
+		}
+
+		private (string, Color) GetChainSegmentDisplay(IReadonlyCutScoreBuffer cutScoreBuffer) =>
+		(
+			Config.ChainLinkDisplay != null ? FormatJudgmentTextByMode(Config.ChainLinkDisplay.Value.Text, cutScoreBuffer)
+				: ChainLinkDisplay.Default.Text,
+			(Config.ChainLinkDisplay?.Color ?? ChainLinkDisplay.Default.Color).ToColor()
+		);
+
+		private string FormatJudgmentTextByMode(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer)
+		{
+			return Config.DisplayMode switch
+			{
+				"format" => FormatJudgmentText(unformattedText, cutScoreBuffer),
+				"textOnly" => unformattedText,
+				"numeric" => cutScoreBuffer.cutScore.ToString(),
+				"scoreOnTop" => $"{cutScoreBuffer.cutScore}\n{unformattedText}\n",
+				_ => $"{unformattedText}\n{cutScoreBuffer.cutScore}\n"
+			};
+		}
+
+		private string FormatJudgmentText(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer)
 		{
 			var formattedBuilder = new StringBuilder();
-			var formatString = judgment.Text;
-			var nextPercentIndex = formatString.IndexOf('%');
+			var nextPercentIndex = unformattedText.IndexOf('%');
+
+			var timeDependence = Mathf.Abs(cutScoreBuffer.noteCutInfo.cutNormal.z);
+
 			while (nextPercentIndex != -1)
 			{
-				formattedBuilder.Append(formatString.Substring(0, nextPercentIndex));
-				if (formatString.Length == nextPercentIndex + 1)
+				formattedBuilder.Append(unformattedText.Substring(0, nextPercentIndex));
+				if (unformattedText.Length == nextPercentIndex + 1)
 				{
-					formatString += " ";
+					unformattedText += " ";
 				}
 
-				var specifier = formatString[nextPercentIndex + 1];
+				var specifier = unformattedText[nextPercentIndex + 1];
 
 				switch (specifier)
 				{
 					case 'b':
-						formattedBuilder.Append(before);
+						formattedBuilder.Append(cutScoreBuffer.beforeCutScore);
 						break;
 					case 'c':
-						formattedBuilder.Append(accuracy);
+						formattedBuilder.Append(cutScoreBuffer.centerDistanceCutScore);
 						break;
 					case 'P':
 						formattedBuilder.Append(trueAccuracy.ToString("F1", CultureInfo.InvariantCulture));
@@ -92,28 +138,28 @@ namespace HitScoreVisualizer.Services
 						formattedBuilder.Append(FormatDirectionSegment(offDirection));
 						break;
 					case 'a':
-						formattedBuilder.Append(after);
+						formattedBuilder.Append(cutScoreBuffer.afterCutScore);
 						break;
 					case 't':
-						formattedBuilder.Append(ConvertTimeDependencePrecision(timeDependence, instance.TimeDependenceDecimalOffset, instance.TimeDependenceDecimalPrecision));
+						formattedBuilder.Append((timeDependence * Mathf.Pow(10, Config.TimeDependenceDecimalOffset)).ToString($"n{Config.TimeDependenceDecimalPrecision}"));
 						break;
 					case 'B':
-						formattedBuilder.Append(JudgeSegment(before, instance.BeforeCutAngleJudgments));
+						formattedBuilder.Append(Config.BeforeCutAngleJudgments.JudgeSegment(cutScoreBuffer.beforeCutScore));
 						break;
 					case 'C':
-						formattedBuilder.Append(JudgeSegment(accuracy, instance.AccuracyJudgments));
+						formattedBuilder.Append(Config.AccuracyJudgments.JudgeSegment(cutScoreBuffer.centerDistanceCutScore));
 						break;
 					case 'A':
-						formattedBuilder.Append(JudgeSegment(after, instance.AfterCutAngleJudgments));
+						formattedBuilder.Append(Config.AfterCutAngleJudgments.JudgeSegment(cutScoreBuffer.afterCutScore));
 						break;
 					case 'T':
-						formattedBuilder.Append(JudgeTimeDependenceSegment(timeDependence, instance.TimeDependenceJudgments, instance));
+						formattedBuilder.Append(Config.TimeDependenceJudgments.JudgeTimeDependenceSegment(timeDependence, Config.TimeDependenceDecimalOffset, Config.TimeDependenceDecimalPrecision));
 						break;
 					case 's':
-						formattedBuilder.Append(score);
+						formattedBuilder.Append(cutScoreBuffer.cutScore);
 						break;
 					case 'p':
-						formattedBuilder.Append($"{(double) score / noteScoreDefinition.maxCutScore * 100:0}");
+						formattedBuilder.Append($"{(double) cutScoreBuffer.cutScore / cutScoreBuffer.noteScoreDefinition.maxCutScore * 100:0}");
 						break;
 					case '%':
 						formattedBuilder.Append("%");
@@ -126,96 +172,11 @@ namespace HitScoreVisualizer.Services
 						break;
 				}
 
-				formatString = formatString.Remove(0, nextPercentIndex + 2);
-				nextPercentIndex = formatString.IndexOf('%');
+				unformattedText = unformattedText.Remove(0, nextPercentIndex + 2);
+				nextPercentIndex = unformattedText.IndexOf('%');
 			}
 
-			return formattedBuilder.Append(formatString).ToString();
-		}
-
-		private static string JudgeSegment(int scoreForSegment, IList<JudgmentSegment>? judgments)
-		{
-			if (judgments == null)
-			{
-				return string.Empty;
-			}
-
-			foreach (var j in judgments)
-			{
-				if (scoreForSegment >= j.Threshold)
-				{
-					return j.Text ?? string.Empty;
-				}
-			}
-
-			return string.Empty;
-		}
-
-		private static string JudgeTimeDependenceSegment(float scoreForSegment, IList<TimeDependenceJudgmentSegment>? judgments, Configuration instance)
-		{
-			if (judgments == null)
-			{
-				return string.Empty;
-			}
-
-			foreach (var j in judgments)
-			{
-				if (scoreForSegment >= j.Threshold)
-				{
-					return FormatTimeDependenceSegment(j, scoreForSegment, instance);
-				}
-			}
-
-			return string.Empty;
-		}
-
-		private static string FormatTimeDependenceSegment(TimeDependenceJudgmentSegment? judgment, float timeDependence, Configuration instance)
-		{
-			if (judgment == null)
-			{
-				return string.Empty;
-			}
-
-			var formattedBuilder = new StringBuilder();
-			var formatString = judgment.Text ?? string.Empty;
-			var nextPercentIndex = formatString.IndexOf('%');
-			while (nextPercentIndex != -1)
-			{
-				formattedBuilder.Append(formatString.Substring(0, nextPercentIndex));
-				if (formatString.Length == nextPercentIndex + 1)
-				{
-					formatString += " ";
-				}
-
-				var specifier = formatString[nextPercentIndex + 1];
-
-				switch (specifier)
-				{
-					case 't':
-						formattedBuilder.Append(ConvertTimeDependencePrecision(timeDependence, instance.TimeDependenceDecimalOffset, instance.TimeDependenceDecimalPrecision));
-						break;
-					case '%':
-						formattedBuilder.Append("%");
-						break;
-					case 'n':
-						formattedBuilder.Append("\n");
-						break;
-					default:
-						formattedBuilder.Append("%" + specifier);
-						break;
-				}
-
-				formatString = formatString.Remove(0, nextPercentIndex + 2);
-				nextPercentIndex = formatString.IndexOf('%');
-			}
-
-			return formattedBuilder.Append(formatString).ToString();
-		}
-
-		private static string ConvertTimeDependencePrecision(float timeDependence, int decimalOffset, int decimalPrecision)
-		{
-			var multiplier = Mathf.Pow(10, decimalOffset);
-			return (timeDependence * multiplier).ToString($"n{decimalPrecision}");
+			return formattedBuilder.Append(unformattedText).ToString();
 		}
 
 		private static string FormatDirectionSegment(OffDirection offDirection)
