@@ -14,18 +14,18 @@ namespace HitScoreVisualizer.Services
 
 		private Configuration Config => configProvider.CurrentConfig ?? Configuration.Default;
 
-		public (string hitScoreText, Color hitScoreColor) Judge(IReadonlyCutScoreBuffer cutScoreBuffer)
+		public (string hitScoreText, Color hitScoreColor) Judge(IReadonlyCutScoreBuffer cutScoreBuffer, OffDirection direction)
 		{
 			return cutScoreBuffer.noteCutInfo.noteData.gameplayType switch
 			{
-				NoteData.GameplayType.Normal => GetNormalDispaly(cutScoreBuffer),
-				NoteData.GameplayType.BurstSliderHead => GetChainHeadDisplay(cutScoreBuffer),
+				NoteData.GameplayType.Normal => GetNormalDispaly(cutScoreBuffer, direction),
+				NoteData.GameplayType.BurstSliderHead => GetChainHeadDisplay(cutScoreBuffer, direction),
 				NoteData.GameplayType.BurstSliderElement => GetChainSegmentDisplay(cutScoreBuffer),
 				_ => (string.Empty, Color.white),
 			};
 		}
 
-		private (string, Color) GetNormalDispaly(IReadonlyCutScoreBuffer cutScoreBuffer)
+		private (string, Color) GetNormalDispaly(IReadonlyCutScoreBuffer cutScoreBuffer, OffDirection direction)
 		{
 			var judgment = NormalJudgment.Default;
 			var fadeJudgment = NormalJudgment.Default;
@@ -51,12 +51,12 @@ namespace HitScoreVisualizer.Services
 					Mathf.InverseLerp(judgment.Threshold, fadeJudgment.Threshold, cutScoreBuffer.cutScore))
 				: judgment.Color.ToColor();
 
-			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer);
+			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer, direction);
 
 			return (text, color);
 		}
 
-		private (string, Color) GetChainHeadDisplay(IReadonlyCutScoreBuffer cutScoreBuffer)
+		private (string, Color) GetChainHeadDisplay(IReadonlyCutScoreBuffer cutScoreBuffer, OffDirection direction)
 		{
 			var judgment = ChainHeadJudgment.Default;
 			var fadeJudgment = ChainHeadJudgment.Default;
@@ -82,7 +82,7 @@ namespace HitScoreVisualizer.Services
 					Mathf.InverseLerp(judgment.Threshold, fadeJudgment.Threshold, cutScoreBuffer.cutScore))
 				: judgment.Color?.ToColor();
 
-			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer);
+			var text = FormatJudgmentTextByMode(judgment.Text, cutScoreBuffer, direction);
 
 			return (text, color ?? Color.white);
 		}
@@ -94,11 +94,11 @@ namespace HitScoreVisualizer.Services
 			(Config.ChainLinkDisplay?.Color ?? ChainLinkDisplay.Default.Color).ToColor()
 		);
 
-		private string FormatJudgmentTextByMode(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer)
+		private string FormatJudgmentTextByMode(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer, OffDirection? direction = OffDirection.NONE)
 		{
 			return Config.DisplayMode switch
 			{
-				"format" => FormatJudgmentText(unformattedText, cutScoreBuffer),
+				"format" => FormatJudgmentText(unformattedText, cutScoreBuffer, direction),
 				"textOnly" => unformattedText,
 				"numeric" => cutScoreBuffer.cutScore.ToString(),
 				"scoreOnTop" => $"{cutScoreBuffer.cutScore}\n{unformattedText}\n",
@@ -106,7 +106,7 @@ namespace HitScoreVisualizer.Services
 			};
 		}
 
-		private string FormatJudgmentText(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer)
+		private string FormatJudgmentText(string unformattedText, IReadonlyCutScoreBuffer cutScoreBuffer, OffDirection? offDirection = OffDirection.NONE)
 		{
 			var formattedBuilder = new StringBuilder();
 			var nextPercentIndex = unformattedText.IndexOf('%');
@@ -132,10 +132,10 @@ namespace HitScoreVisualizer.Services
 						formattedBuilder.Append(cutScoreBuffer.centerDistanceCutScore);
 						break;
 					case 'P':
-						formattedBuilder.Append(trueAccuracy.ToString("F1", CultureInfo.InvariantCulture));
+						formattedBuilder.Append((1f - Mathf.Clamp01(cutScoreBuffer.noteCutInfo.cutDistanceToCenter / 0.3f)) * 15f);
 						break;
 					case 'd':
-						formattedBuilder.Append(FormatDirectionSegment(offDirection));
+						formattedBuilder.Append(offDirection.HasValue ? FormatDirectionSegment(offDirection.Value) : "");
 						break;
 					case 'a':
 						formattedBuilder.Append(cutScoreBuffer.afterCutScore);

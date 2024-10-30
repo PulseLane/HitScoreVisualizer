@@ -16,6 +16,7 @@ namespace HitScoreVisualizer.Installers
 			Container.BindInterfacesAndSelfTo<BloomFontProvider>().AsSingle();
 
 			Container.Bind<JudgmentService>().AsSingle();
+			Container.BindInterfacesAndSelfTo<ScoreControllerHandleWasCutPatch>().AsSingle();
 			Container.BindInterfacesTo<FlyingScoreEffectPatch>().AsSingle();
 			Container.BindInterfacesTo<EffectPoolsManualInstallerPatch>().AsSingle();
 		}

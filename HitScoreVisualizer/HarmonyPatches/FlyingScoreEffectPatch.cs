@@ -1,3 +1,4 @@
+using HitScoreVisualizer.Models;
 using HitScoreVisualizer.Services;
 using SiraUtil.Affinity;
 using UnityEngine;
@@ -101,7 +102,9 @@ namespace HitScoreVisualizer.HarmonyPatches
 
 		private void Judge(FlyingScoreEffect flyingScoreEffect, IReadonlyCutScoreBuffer cutScoreBuffer)
 		{
-			(flyingScoreEffect._text.text, flyingScoreEffect._color) = judgmentService.Judge(cutScoreBuffer);
+			OffDirection direction = OffDirection.NONE;
+			_directionProvider!.directionDict.TryGetValue(cutScoreBuffer.noteCutInfo, out direction);
+			(flyingScoreEffect._text.text, flyingScoreEffect._color) = judgmentService.Judge(cutScoreBuffer, direction);
 		}
 	}
 }
